@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>流程图高亮查看</title>
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/diagram-js.css" />
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-js.css" />
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; font-family: Arial, sans-serif; }
+        #toolbar {
+            padding: 8px 10px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #toolbar input { width: 300px; padding: 6px 10px; }
+        #toolbar button { padding: 6px 14px; cursor: pointer; }
+        #container {
+            width: 100%;
+            height: calc(100vh - 55px);
+            background:
+                    linear-gradient(90deg, #f0f0f0 1px, transparent 1px) 0 0 / 20px 20px,
+                    linear-gradient(#f0f0f0 1px, transparent 1px) 0 0 / 20px 20px;
+        }
+        /* 拖拽时鼠标样式 */
+        #container .djs-container { cursor: grab; }
+        #container .djs-container:active { cursor: grabbing; }
+
+        /* ====== 高亮样式 ====== */
+        .highlight-node .djs-visual > :nth-child(1) {
+            stroke: #28a745 !important;
+            stroke-width: 3px !important;
+            fill: #d4edda !important;
+            fill-opacity: 0.4;
+        }
+        .highlight-flow .djs-visual > path,
+        .highlight-flow .djs-visual > polyline {
+            stroke: #28a745 !important;
+            stroke-width: 3px !important;
+            fill: none !important;
+        }
+        .highlight-flow .djs-visual > path[fill]:not([fill="none"]),
+        .highlight-flow .djs-visual > polygon {
+            fill: #28a745 !important;
+            stroke: #28a745 !important;
+        }
+        /* 箭头 marker 跟随 stroke 颜色 */
+        svg marker path,
+        svg marker polygon,
+        svg marker polyline {
+            fill: context-stroke !important;
+            stroke: context-stroke !important;
+        }
+        .current-node .djs-visual > :nth-child(1) {
+            stroke: #007bff !important;
+            stroke-width: 3px !important;
+            fill: #cce5ff !important;
+            fill-opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+<div id="toolbar">
+    <input type="text" id="instanceId" placeholder="流程实例 ID" />
+    <input type="text" id="processDefId" placeholder="流程定义 ID" style="width:400px" />
+    <button onclick="renderHighlight()">查看高亮</button>
+    <button onclick="zoom(0.2)">放大 +</button>
+    <button onclick="zoom(-0.2)">缩小 −</button>
+    <button onclick="fitViewport()">适应窗口</button>
+</div>
+<div id="container"></div>
+
+<!-- ★ 换成 navigated viewer -->
+<script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-navigated-viewer.development.js"></script>
+<script>
+    // ★ 全局变量名是 BpmnNavigatedViewer（不是 BpmnJS）
+    const viewer = new BpmnJS({
+        container: '#container',
+        keyboard: { bindTo: document }
+    });
+
+    function zoom(delta) {
+        const canvas = viewer.get('canvas');
+        canvas.zoom(canvas.zoom() + delta);
+    }
+
+    function fitViewport() {
+        viewer.get('canvas').zoom('fit-viewport');
+    }
+
+    async function renderHighlight() {
+        const instanceId = document.getElementById('instanceId').value.trim();
+        const processDefId = document.getElementById('processDefId').value.trim();
+        if (!instanceId || !processDefId) {
+            alert('请输入流程实例 ID 和流程定义 ID');
+            return;
+        }
+
+        try {
+            const xmlRes = await fetch(
+                `/api/process/bpmn-xml?processDefinitionId=${encodeURIComponent(processDefId)}`);
+            if (!xmlRes.ok) {
+                throw new Error(`加载流程图失败 (HTTP ${xmlRes.status}): ${await xmlRes.text()}`);
+            }
+            await viewer.importXML(await xmlRes.text());
+
+            const res = await fetch(`/api/process/${instanceId}/highlight`);
+            if (!res.ok) throw new Error(`获取高亮数据失败 (HTTP ${res.status})`);
+            const data = await res.json();
+
+            const canvas = viewer.get('canvas');
+
+            // 清除之前的标记（如果重复点击"查看高亮"）
+            viewer.get('elementRegistry').getAll().forEach(el => {
+                canvas.removeMarker(el.id, 'highlight-node');
+                canvas.removeMarker(el.id, 'highlight-flow');
+                canvas.removeMarker(el.id, 'current-node');
+            });
+
+            (data.executedNodeIds || []).forEach(id => canvas.addMarker(id, 'highlight-node'));
+            (data.executedSequenceFlowIds || []).forEach(id => canvas.addMarker(id, 'highlight-flow'));
+            (data.currentActivityIds || []).forEach(id => canvas.addMarker(id, 'current-node'));
+
+            canvas.zoom('fit-viewport');
+        } catch (error) {
+            console.error('渲染失败:', error);
+            alert('渲染失败: ' + error.message);
+        }
+    }
+
+    window.addEventListener('load', () => {
+        fetch('/api/process/default-instance')
+            .then(r => r.json())
+            .then(data => {
+                if (data.instanceId) {
+                    document.getElementById('instanceId').value = data.instanceId;
+                    document.getElementById('processDefId').value = data.processDefinitionId;
+                    renderHighlight();
+                }
+            }).catch(() => {});
+    });
+</script>
+</body>
+</html>
