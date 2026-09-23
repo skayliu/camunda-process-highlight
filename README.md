@@ -8,7 +8,13 @@
 进行可视化展示。
 
 项目适合用于理解流程轨迹采集、自定义执行审计、给业务门户集成流程图高亮等场景。它不是完整的流程监控平台，也不包含统计报表、权限控制和生产级运维能力。
+ 
+![ScreenShot_2026-09-24_005425_976.png](src/main/resources/docs/ScreenShot_2026-09-24_005425_976.png)
+![ScreenShot_2026-09-24_010038_276.png](src/main/resources/docs/ScreenShot_2026-09-24_010038_276.png)
+![ScreenShot_2026-09-24_010133_099.png](src/main/resources/docs/ScreenShot_2026-09-24_010133_099.png)
 
+![ScreenShot_2026-09-24_010215_721.png](src/main/resources/docs/ScreenShot_2026-09-24_010215_721.png)
+![ScreenShot_2026-09-24_010245_945.png](src/main/resources/docs/ScreenShot_2026-09-24_010245_945.png)
 ---
 
 ## 1. 技术栈与版本
